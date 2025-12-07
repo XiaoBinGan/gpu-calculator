@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GPU显存计算器 - AI大模型部署助手</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            background:linear-gradient(135deg, #202335 0%, #000000 100%);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        #particles-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        .container {
+            position: relative;
+            z-index: 2;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            color: #2d3748;
+            margin-bottom: 10px;
+            -webkit-background-clip: text;
+           
+            background-clip: text;
+        }
+
+        .subtitle {
+            color: #718096;
+            font-size: 1rem;
+            margin-bottom: 30px;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        label {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #4a5568;
+            margin-bottom: 8px;
+        }
+
+        select, input {
+            padding: 12px 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            font-size: 1rem;
+            transition: all 0.3s;
+            background: white;
+        }
+
+        select:focus, input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .results-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .result-card {
+            padding: 25px;
+            border: 2px solid #e2e8f0;
+            border-radius: 15px;
+            background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+        }
+
+        .result-card h2 {
+            font-size: 1.25rem;
+            color: #2d3748;
+            margin-bottom: 20px;
+        }
+
+        .result-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .result-item:last-child {
+            border-bottom: none;
+        }
+
+        .result-label {
+            font-size: 0.875rem;
+            color: #718096;
+        }
+
+        .result-value {
+            font-weight: 700;
+            color: #2d3748;
+            font-size: 1rem;
+        }
+
+        .highlight {
+            font-size: 1.5rem;
+            color: #667eea;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #e2e8f0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 15px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding-right: 10px;
+            color: white;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+
+        .status-success {
+            background: #c6f6d5;
+            color: #22543d;
+        }
+
+        .status-warning {
+            background: #fed7d7;
+            color: #742a2a;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 15px;
+            justify-content: flex-end;
+            margin-top: 30px;
+            flex-wrap: wrap;
+        }
+
+        button, .btn {
+            padding: 12px 24px;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: none;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #000000 0%, #d7cee1 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: white;
+            color: #667eea;
+            border: 2px solid #667eea;
+        }
+
+        .btn-secondary:hover {
+            background: #667eea;
+            color: white;
+        }
+
+        .tips {
+            margin-top: 20px;
+            padding: 15px;
+            background: #fff5e1;
+            border-left: 4px solid #f59e0b;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            color: #92400e;
+        }
+
+        .gpu-list {
+            margin-top: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .gpu-item {
+            padding: 12px;
+            margin-bottom: 8px;
+            border-radius: 8px;
+            background: white;
+            border: 2px solid transparent;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .gpu-item:hover {
+            border-color: #667eea;
+            transform: translateX(5px);
+        }
+
+        .gpu-item.recommended {
+            border-color: #48bb78;
+            background: #f0fff4;
+        }
+
+        .gpu-item.insufficient {
+            opacity: 0.5;
+        }
+
+        .gpu-name {
+            font-weight: 600;
+            font-size: 0.875rem;
+        }
+
+        .gpu-vram {
+            color: #718096;
+            font-size: 0.875rem;
+        }
+        /* .gpu-item {
+            padding: 10px;
+            margin: 5px 0;
+            cursor: pointer;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+        }
+
+        .gpu-item:hover {
+            background-color: #f5f5f5;
+        }
+
+        .gpu-item.selected {
+            background-color: #007bff;
+            color: white;
+            border-color: #0056b3;
+        }
+
+        .gpu-item.recommended {
+            border-left: 4px solid #28a745;
+            font-weight: bold;
+        }
+
+        .gpu-item.insufficient {
+            opacity: 0.6;
+            background-color: #f8f9fa;
+        }
+
+        .gpu-name {
+            display: block;
+            font-weight: bold;
+        }
+
+        .gpu-vram {
+            display: block;
+            font-size: 0.9em;
+            color: #666;
+        } */
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2rem;
+            }
+            
+            .card {
+                padding: 20px;
+            }
+            
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="particles-canvas"></canvas>
+    
+    <div class="container">
+        <div class="card">
+            <h1>🚀 GPU显存计算器</h1>
+            <p class="subtitle">精准估算AI大模型部署所需显存，选择最适合的GPU配置</p>
+
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="model-select">选择模型</label>
+                    <select id="model-select"></select>
+                </div>
+
+                <div class="form-group">
+                    <label for="quant-select">量化精度</label>
+                    <select id="quant-select"></select>
+                </div>
+
+                <div class="form-group">
+                    <label for="context-input">上下文长度 (tokens)</label>
+                    <input type="number" id="context-input" min="128" max="1000000" step="1024" value="4096">
+                </div>
+            </div>
+
+            <div class="results-grid">
+                <div class="result-card">
+                    <h2>📊 显存占用估算</h2>
+                    <div class="result-item">
+                        <span class="result-label">模型权重</span>
+                        <span class="result-value" id="weight-vram">0.00 GB</span>
+                    </div>
+                    <div class="result-item">
+                        <span class="result-label">KV Cache</span>
+                        <span class="result-value" id="kv-cache">0.00 GB</span>
+                    </div>
+                    <div class="result-item">
+                        <span class="result-label">框架开销</span>
+                        <span class="result-value" id="framework-overhead">1.50 GB</span>
+                    </div>
+                    <div class="result-item" style="border-top: 2px solid #667eea; margin-top: 10px; padding-top: 15px;">
+                        <span class="result-label">总显存需求</span>
+                        <span class="result-value highlight" id="total-vram">0.00 GB</span>
+                    </div>
+
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="vram-progress" style="width: 0%">0%</div>
+                    </div>
+                </div>
+
+                <div class="result-card">
+                    <h2>💎 推荐GPU配置</h2>
+                    <div class="result-item">
+                        <span class="result-label">最佳选择</span>
+                        <span class="result-value" id="recommended-gpu">-</span>
+                    </div>
+                    <div class="result-item">
+                        <span class="result-label">显存容量</span>
+                        <span class="result-value" id="gpu-vram">- GB</span>
+                    </div>
+                    <div class="result-item">
+                        <span class="result-label">预计占用率</span>
+                        <span class="result-value" id="occupancy">0%</span>
+                    </div>
+                    <div class="result-item">
+                        <span class="result-label">能否满足</span>
+                        <span class="status-badge" id="status-badge">待计算</span>
+                    </div>
+
+                    <div class="gpu-list" id="gpu-list"></div>
+                </div>
+            </div>
+
+            <div class="tips">
+                <strong>💡 使用提示：</strong> 本工具基于经验公式估算，实际部署时请预留15-20%显存余量。不同推理框架(vLLM/llama.cpp/TensorRT-LLM)的显存占用可能有差异。
+            </div>
+
+            <div class="button-group">
+                <button class="btn btn-primary" onclick="copyConfig()">📋 复制配置</button>
+                <button class="btn btn-secondary" onclick="shareLink()">🔗 分享链接</button>
+                <button class="btn btn-secondary" onclick="resetForm()">🔄 重置</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 粒子系统
+        class ParticleSystem {
+            constructor() {
+                this.canvas = document.getElementById('particles-canvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.particles = [];
+                this.mouse = { x: 0, y: 0 };
+                this.init();
+            }
+
+            init() {
+                this.resize();
+                window.addEventListener('resize', () => this.resize());
+                document.addEventListener('mousemove', (e) => {
+                    this.mouse.x = e.clientX;
+                    this.mouse.y = e.clientY;
+                });
+
+                for (let i = 0; i < 80; i++) {
+                    this.particles.push({
+                        x: Math.random() * this.canvas.width,
+                        y: Math.random() * this.canvas.height,
+                        vx: (Math.random() - 0.5) * 0.5,
+                        vy: (Math.random() - 0.5) * 0.5,
+                        radius: Math.random() * 2 + 1,
+                        opacity: Math.random() * 0.5 + 0.3
+                    });
+                }
+
+                this.animate();
+            }
+
+            resize() {
+                this.canvas.width = window.innerWidth;
+                this.canvas.height = window.innerHeight;
+            }
+
+            animate() {
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+                this.particles.forEach((particle, i) => {
+                    const dx = this.mouse.x - particle.x;
+                    const dy = this.mouse.y - particle.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    const maxDistance = 200;
+
+                    if (distance < maxDistance) {
+                        const force = (maxDistance - distance) / maxDistance;
+                        particle.vx += (dx / distance) * force * 0.02;
+                        particle.vy += (dy / distance) * force * 0.02;
+                    }
+
+                    particle.vx *= 0.98;
+                    particle.vy *= 0.98;
+                    particle.x += particle.vx;
+                    particle.y += particle.vy;
+
+                    if (particle.x < 0 || particle.x > this.canvas.width) particle.vx *= -1;
+                    if (particle.y < 0 || particle.y > this.canvas.height) particle.vy *= -1;
+
+                    this.ctx.beginPath();
+                    this.ctx.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
+                    this.ctx.fillStyle = `rgba(255, 255, 255, ${particle.opacity})`;
+                    this.ctx.fill();
+
+                    this.particles.slice(i + 1).forEach(other => {
+                        const dx = other.x - particle.x;
+                        const dy = other.y - particle.y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+
+                        if (dist < 150) {
+                            this.ctx.beginPath();
+                            this.ctx.moveTo(particle.x, particle.y);
+                            this.ctx.lineTo(other.x, other.y);
+                            this.ctx.strokeStyle = `rgba(255, 255, 255, ${0.15 * (1 - dist / 150)})`;
+                            this.ctx.lineWidth = 1;
+                            this.ctx.stroke();
+                        }
+                    });
+                });
+
+                requestAnimationFrame(() => this.animate());
+            }
+        }
+
+        // 数据定义
+        const MODELS = [
+  { "id": "qwen-0.5b", "name": "Qwen2.5-0.5B", "base_vram_gb": 1, "params": "0.5B" },
+  { "id": "qwen-1.5b", "name": "Qwen2.5-1.5B", "base_vram_gb": 3, "params": "1.5B" },
+  { "id": "qwen-3b", "name": "Qwen2.5-3B", "base_vram_gb": 6, "params": "3B" },
+  { "id": "qwen-7b", "name": "Qwen2.5-7B", "base_vram_gb": 14, "params": "7B" },
+  { "id": "qwen-14b", "name": "Qwen2.5-14B", "base_vram_gb": 28, "params": "14B" },
+  { "id": "qwen-32b", "name": "Qwen2.5-32B", "base_vram_gb": 64, "params": "32B" },
+  { "id": "qwen-72b", "name": "Qwen2.5-72B", "base_vram_gb": 144, "params": "72B" },
+  { "id": "qwen-coder-1.5b", "name": "Qwen2.5-Coder-1.5B", "base_vram_gb": 3, "params": "1.5B" },
+  { "id": "qwen-coder-7b", "name": "Qwen2.5-Coder-7B", "base_vram_gb": 14, "params": "7B" },
+  { "id": "qwen-coder-32b", "name": "Qwen2.5-Coder-32B", "base_vram_gb": 64, "params": "32B" },
+  { "id": "qwen3-0.6b", "name": "Qwen3-0.6B", "base_vram_gb": 1.2, "params": "0.6B" },
+  { "id": "qwen3-1.8b", "name": "Qwen3-1.8B", "base_vram_gb": 3.6, "params": "1.8B" },
+  { "id": "qwen3-4b", "name": "Qwen3-4B", "base_vram_gb": 8, "params": "4B" },
+  { "id": "qwen3-7b", "name": "Qwen3-7B", "base_vram_gb": 14, "params": "7B" },
+  { "id": "qwen3-14b", "name": "Qwen3-14B", "base_vram_gb": 28, "params": "14B" },
+  { "id": "qwen3-32b", "name": "Qwen3-32B", "base_vram_gb": 64, "params": "32B" },
+  { "id": "qwen3-72b", "name": "Qwen3-72B", "base_vram_gb": 144, "params": "72B" },
+  { "id": "qwen3-coder-1.8b", "name": "Qwen3-Coder-1.8B", "base_vram_gb": 3.6, "params": "1.8B" },
+  { "id": "qwen3-coder-7b", "name": "Qwen3-Coder-7B", "base_vram_gb": 14, "params": "7B" },
+  { "id": "qwen3-coder-32b", "name": "Qwen3-Coder-32B", "base_vram_gb": 64, "params": "32B" },
+  { "id": "qwen3-vl-2b", "name": "Qwen3-VL-2B", "base_vram_gb": 4, "params": "2B" },
+  { "id": "qwen3-vl-7b", "name": "Qwen3-VL-7B", "base_vram_gb": 14, "params": "7B" },
+  { "id": "qwen3-vl-72b", "name": "Qwen3-VL-72B", "base_vram_gb": 144, "params": "72B" },
+  { "id": "qwen3-audio-2b", "name": "Qwen3-Audio-2B", "base_vram_gb": 4, "params": "2B" },
+  { "id": "qwen3-audio-7b", "name": "Qwen3-Audio-7B", "base_vram_gb": 14, "params": "7B" },
+  { "id": "llama-3.3-70b", "name": "Llama-3.3-70B", "base_vram_gb": 140, "params": "70B" },
+  { "id": "llama-3.2-1b", "name": "Llama-3.2-1B", "base_vram_gb": 2, "params": "1B" },
+  { "id": "llama-3.2-3b", "name": "Llama-3.2-3B", "base_vram_gb": 6, "params": "3B" },
+  { "id": "llama-3.1-8b", "name": "Llama-3.1-8B", "base_vram_gb": 16, "params": "8B" },
+  { "id": "llama-3.1-70b", "name": "Llama-3.1-70B", "base_vram_gb": 140, "params": "70B" },
+  { "id": "llama-3.1-405b", "name": "Llama-3.1-405B", "base_vram_gb": 810, "params": "405B" },
+  { "id": "mistral-7b", "name": "Mistral-7B-v0.3", "base_vram_gb": 14, "params": "7B" },
+  { "id": "mixtral-8x7b", "name": "Mixtral-8x7B", "base_vram_gb": 90, "params": "47B" },
+  { "id": "mixtral-8x22b", "name": "Mixtral-8x22B", "base_vram_gb": 280, "params": "141B" },
+  { "id": "deepseek-v3", "name": "DeepSeek-V3-671B", "base_vram_gb": 1342, "params": "671B" },
+  { "id": "deepseek-coder-33b", "name": "DeepSeek-Coder-33B", "base_vram_gb": 66, "params": "33B" },
+  { "id": "yi-6b", "name": "Yi-6B", "base_vram_gb": 12, "params": "6B" },
+  { "id": "yi-34b", "name": "Yi-34B", "base_vram_gb": 68, "params": "34B" },
+  { "id": "gemma-2b", "name": "Gemma-2B", "base_vram_gb": 4, "params": "2B" },
+  { "id": "gemma-7b", "name": "Gemma-7B", "base_vram_gb": 14, "params": "7B" },
+  { "id": "gemma-2-27b", "name": "Gemma-2-27B", "base_vram_gb": 54, "params": "27B" },
+  { "id": "glm-4-9b", "name": "GLM-4-9B", "base_vram_gb": 18, "params": "9B" },
+  { "id": "chatglm3-6b", "name": "ChatGLM3-6B", "base_vram_gb": 12, "params": "6B" },
+  { "id": "phi-3-mini", "name": "Phi-3-Mini-3.8B", "base_vram_gb": 7.6, "params": "3.8B" },
+  { "id": "phi-3-medium", "name": "Phi-3-Medium-14B", "base_vram_gb": 28, "params": "14B" },
+  { "id": "baichuan2-7b", "name": "Baichuan2-7B", "base_vram_gb": 14, "params": "7B" },
+  { "id": "baichuan2-13b", "name": "Baichuan2-13B", "base_vram_gb": 26, "params": "13B" },
+  { "id": "internlm2-7b", "name": "InternLM2-7B", "base_vram_gb": 14, "params": "7B" },
+  { "id": "internlm2-20b", "name": "InternLM2-20B", "base_vram_gb": 40, "params": "20B" },
+  { "id": "deepseek-v2.5", "name": "DeepSeek-V2.5-236B", "base_vram_gb": 472, "params": "236B" },
+  { "id": "deepseek-r1", "name": "DeepSeek-R1-671B", "base_vram_gb": 1342, "params": "671B" },
+  { "id": "deepseek-r1-distill-qwen-32b", "name": "DeepSeek-R1-Distill-Qwen-32B", "base_vram_gb": 64, "params": "32B" },
+  { "id": "deepseek-r1-distill-qwen-14b", "name": "DeepSeek-R1-Distill-Qwen-14B", "base_vram_gb": 28, "params": "14B" },
+  { "id": "deepseek-r1-distill-qwen-7b", "name": "DeepSeek-R1-Distill-Qwen-7B", "base_vram_gb": 14, "params": "7B" },
+  { "id": "deepseek-r1-distill-llama-70b", "name": "DeepSeek-R1-Distill-Llama-70B", "base_vram_gb": 140, "params": "70B" },
+  { "id": "deepseek-r1-distill-llama-8b", "name": "DeepSeek-R1-Distill-Llama-8B", "base_vram_gb": 16, "params": "8B" },
+  { "id": "llama-4-scout", "name": "Llama-4-Scout-17B", "base_vram_gb": 34, "params": "17B" },
+  { "id": "llama-4-maverick", "name": "Llama-4-Maverick-54B", "base_vram_gb": 108, "params": "54B" },
+  { "id": "qwen-2.5-max", "name": "Qwen2.5-Max", "base_vram_gb": 1200, "params": "600B" },
+  { "id": "mistral-pixtral-12b", "name": "Mistral-Pixtral-12B", "base_vram_gb": 24, "params": "12B" },
+  { "id": "mistral-nemo-12b", "name": "Mistral-Nemo-12B", "base_vram_gb": 24, "params": "12B" },
+  { "id": "gemma-2-2b", "name": "Gemma-2-2B", "base_vram_gb": 4, "params": "2B" },
+  { "id": "gemma-2-9b", "name": "Gemma-2-9B", "base_vram_gb": 18, "params": "9B" },
+  { "id": "command-r", "name": "Command-R-35B", "base_vram_gb": 70, "params": "35B" },
+  { "id": "command-r-plus", "name": "Command-R-Plus-104B", "base_vram_gb": 208, "params": "104B" },
+  { "id": "phi-4", "name": "Phi-4-14B", "base_vram_gb": 28, "params": "14B" },
+  { "id": "yi-lightning", "name": "Yi-Lightning", "base_vram_gb": 1000, "params": "500B" },
+  { "id": "nemotron-4-340b", "name": "Nemotron-4-340B", "base_vram_gb": 680, "params": "340B" },
+  { "id": "dbrx", "name": "DBRX-132B", "base_vram_gb": 264, "params": "132B" },
+  { "id": "aya-23-8b", "name": "Aya-23-8B", "base_vram_gb": 16, "params": "8B" },
+  { "id": "aya-23-35b", "name": "Aya-23-35B", "base_vram_gb": 70, "params": "35B" },
+  { "id": "granite-3.0-2b", "name": "Granite-3.0-2B", "base_vram_gb": 4, "params": "2B" },
+  { "id": "granite-3.0-8b", "name": "Granite-3.0-8B", "base_vram_gb": 16, "params": "8B" },
+  { "id": "olmo-7b", "name": "OLMo-7B", "base_vram_gb": 14, "params": "7B" },
+  { "id": "olmo-2-7b", "name": "OLMo-2-7B", "base_vram_gb": 14, "params": "7B" },
+  { "id": "olmo-2-13b", "name": "OLMo-2-13B", "base_vram_gb": 26, "params": "13B" },
+  { "id": "exaone-3.0-7.8b", "name": "Exaone-3.0-7.8B", "base_vram_gb": 15.6, "params": "7.8B" },
+  { "id": "marco-o1-7b", "name": "Marco-o1-7B", "base_vram_gb": 14, "params": "7B" },
+  { "id": "skywork-o1-open-8b", "name": "Skywork-o1-Open-8B", "base_vram_gb": 16, "params": "8B" },
+  { "id": "smollm2-135m", "name": "SmolLM2-135M", "base_vram_gb": 0.3, "params": "135M" },
+  { "id": "smollm2-360m", "name": "SmolLM2-360M", "base_vram_gb": 0.7, "params": "360M" },
+  { "id": "smollm2-1.7b", "name": "SmolLM2-1.7B", "base_vram_gb": 3.4, "params": "1.7B" },
+  { "id": "ministral-3b", "name": "Ministral-3B", "base_vram_gb": 6, "params": "3B" },
+  { "id": "ministral-8b", "name": "Ministral-8B", "base_vram_gb": 16, "params": "8B" },
+  { "id": "reflection", "name": "Reflection", "base_vram_gb": 0, "params": "unknown" }
+].sort((a, b) => a.name.localeCompare(b.name));
+
+        const QUANTIZATIONS = [
+            { id: "fp16", name: "FP16 (完整精度)", multiplier: 1.0, desc: "2字节/参数" },
+            { id: "int8", name: "INT8/Q8_0", multiplier: 0.5, desc: "精度损失<1%" },
+            { id: "q5", name: "Q5_K_M", multiplier: 0.3125, desc: "精度损失2-3%" },
+            { id: "q4", name: "Q4_K_M (推荐)", multiplier: 0.25, desc: "精度损失3-5%" },
+            { id: "q3", name: "Q3_K_M", multiplier: 0.1875, desc: "精度损失5-8%" },
+        ];
+
+const GPUS = [
+    // NVIDIA 数据中心 GPU (Hopper架构)
+    { id: "h200", name: "NVIDIA H200 141GB HBM3e", vram: 141 },
+    { id: "h100-sxm-80", name: "NVIDIA H100 SXM 80GB", vram: 80 },
+    { id: "h100-pcie-80", name: "NVIDIA H100 PCIe 80GB", vram: 80 },
+    { id: "h100-94", name: "NVIDIA H100 94GB HBM3", vram: 94 },
+    
+    // NVIDIA 数据中心 GPU (Ampere架构)
+    { id: "a100-sxm-80", name: "NVIDIA A100 SXM 80GB", vram: 80 },
+    { id: "a100-pcie-80", name: "NVIDIA A100 PCIe 80GB", vram: 80 },
+    { id: "a100-sxm-40", name: "NVIDIA A100 SXM 40GB", vram: 40 },
+    { id: "a100-pcie-40", name: "NVIDIA A100 PCIe 40GB", vram: 40 },
+    { id: "a800-80", name: "NVIDIA A800 80GB", vram: 80 },
+    { id: "a800-40", name: "NVIDIA A800 40GB", vram: 40 },
+    { id: "a40", name: "NVIDIA A40 48GB", vram: 48 },
+    { id: "a30", name: "NVIDIA A30 24GB", vram: 24 },
+    { id: "a16", name: "NVIDIA A16 16GB", vram: 16 },
+    { id: "a10", name: "NVIDIA A10 24GB", vram: 24 },
+    { id: "a10g", name: "NVIDIA A10G 24GB", vram: 24 },
+    
+    // NVIDIA 数据中心 GPU (Volta架构)
+    { id: "v100-sxm-32", name: "NVIDIA V100 SXM 32GB", vram: 32 },
+    { id: "v100-pcie-32", name: "NVIDIA V100 PCIe 32GB", vram: 32 },
+    { id: "v100-sxm-16", name: "NVIDIA V100 SXM 16GB", vram: 16 },
+    { id: "v100-pcie-16", name: "NVIDIA V100 PCIe 16GB", vram: 16 },
+    
+    // NVIDIA 数据中心 GPU (Pascal/Turing)
+    { id: "p100-16", name: "NVIDIA P100 16GB", vram: 16 },
+    { id: "p40", name: "NVIDIA P40 24GB", vram: 24 },
+    { id: "t4", name: "NVIDIA T4 16GB", vram: 16 },
+    
+    // NVIDIA 专业可视化 GPU (Ada Lovelace)
+    { id: "l40s", name: "NVIDIA L40S 48GB", vram: 48 },
+    { id: "l40", name: "NVIDIA L40 48GB", vram: 48 },
+    { id: "l4", name: "NVIDIA L4 24GB", vram: 24 },
+    { id: "rtx-6000ada", name: "NVIDIA RTX 6000 Ada 48GB", vram: 48 },
+    { id: "rtx-5880ada", name: "NVIDIA RTX 5880 Ada 48GB", vram: 48 },
+    { id: "rtx-5000ada", name: "NVIDIA RTX 5000 Ada 32GB", vram: 32 },
+    { id: "rtx-4500ada", name: "NVIDIA RTX 4500 Ada 24GB", vram: 24 },
+    { id: "rtx-4000ada", name: "NVIDIA RTX 4000 Ada 20GB", vram: 20 },
+    { id: "rtx-4000-sff-ada", name: "NVIDIA RTX 4000 SFF Ada 20GB", vram: 20 },
+    
+    // NVIDIA 专业可视化 GPU (Ampere)
+    { id: "rtx-a6000", name: "NVIDIA RTX A6000 48GB", vram: 48 },
+    { id: "rtx-a5500", name: "NVIDIA RTX A5500 24GB", vram: 24 },
+    { id: "rtx-a5000", name: "NVIDIA RTX A5000 24GB", vram: 24 },
+    { id: "rtx-a4500", name: "NVIDIA RTX A4500 20GB", vram: 20 },
+    { id: "rtx-a4000", name: "NVIDIA RTX A4000 16GB", vram: 16 },
+    { id: "rtx-a2000", name: "NVIDIA RTX A2000 12GB", vram: 12 },
+    
+    // NVIDIA 消费级 GPU (Blackwell - RTX 50系列)
+    { id: "rtx-5090", name: "NVIDIA RTX 5090 32GB", vram: 32 },
+    { id: "rtx-5080", name: "NVIDIA RTX 5080 16GB", vram: 16 },
+    { id: "rtx-5070ti", name: "NVIDIA RTX 5070 Ti 16GB", vram: 16 },
+    { id: "rtx-5070", name: "NVIDIA RTX 5070 12GB", vram: 12 },
+    
+    // NVIDIA 消费级 GPU (Ada Lovelace - RTX 40系列)
+    { id: "rtx-4090", name: "NVIDIA RTX 4090 24GB", vram: 24 },
+    { id: "rtx-4080-super", name: "NVIDIA RTX 4080 Super 16GB", vram: 16 },
+    { id: "rtx-4080", name: "NVIDIA RTX 4080 16GB", vram: 16 },
+    { id: "rtx-4070ti-super", name: "NVIDIA RTX 4070 Ti Super 16GB", vram: 16 },
+    { id: "rtx-4070ti", name: "NVIDIA RTX 4070 Ti 12GB", vram: 12 },
+    { id: "rtx-4070-super", name: "NVIDIA RTX 4070 Super 12GB", vram: 12 },
+    { id: "rtx-4070", name: "NVIDIA RTX 4070 12GB", vram: 12 },
+    { id: "rtx-4060ti-16", name: "NVIDIA RTX 4060 Ti 16GB", vram: 16 },
+    { id: "rtx-4060ti-8", name: "NVIDIA RTX 4060 Ti 8GB", vram: 8 },
+    { id: "rtx-4060", name: "NVIDIA RTX 4060 8GB", vram: 8 },
+    
+    // NVIDIA 消费级 GPU (Ampere - RTX 30系列)
+    { id: "rtx-3090ti", name: "NVIDIA RTX 3090 Ti 24GB", vram: 24 },
+    { id: "rtx-3090", name: "NVIDIA RTX 3090 24GB", vram: 24 },
+    { id: "rtx-3080ti", name: "NVIDIA RTX 3080 Ti 12GB", vram: 12 },
+    { id: "rtx-3080-12", name: "NVIDIA RTX 3080 12GB", vram: 12 },
+    { id: "rtx-3080-10", name: "NVIDIA RTX 3080 10GB", vram: 10 },
+    { id: "rtx-3070ti", name: "NVIDIA RTX 3070 Ti 8GB", vram: 8 },
+    { id: "rtx-3070", name: "NVIDIA RTX 3070 8GB", vram: 8 },
+    { id: "rtx-3060ti", name: "NVIDIA RTX 3060 Ti 8GB", vram: 8 },
+    { id: "rtx-3060-12", name: "NVIDIA RTX 3060 12GB", vram: 12 },
+    { id: "rtx-3060-8", name: "NVIDIA RTX 3060 8GB", vram: 8 },
+    
+    // NVIDIA 工作站移动 GPU
+    { id: "rtx-5000-mobile-ada", name: "NVIDIA RTX 5000 Mobile Ada 16GB", vram: 16 },
+    { id: "rtx-4000-mobile-ada", name: "NVIDIA RTX 4000 Mobile Ada 12GB", vram: 12 },
+    { id: "rtx-a5500-mobile", name: "NVIDIA RTX A5500 Mobile 16GB", vram: 16 },
+    { id: "rtx-a4500-mobile", name: "NVIDIA RTX A4500 Mobile 16GB", vram: 16 },
+    
+    // AMD 数据中心 GPU (MI300系列)
+    { id: "mi300x", name: "AMD Instinct MI300X 192GB", vram: 192 },
+    { id: "mi300a", name: "AMD Instinct MI300A 128GB", vram: 128 },
+    
+    // AMD 数据中心 GPU (MI200系列)
+    { id: "mi250x", name: "AMD Instinct MI250X 128GB", vram: 128 },
+    { id: "mi250", name: "AMD Instinct MI250 128GB", vram: 128 },
+    { id: "mi210", name: "AMD Instinct MI210 64GB", vram: 64 },
+    
+    // AMD 数据中心 GPU (MI100系列)
+    { id: "mi100", name: "AMD Instinct MI100 32GB", vram: 32 },
+    
+    // AMD 专业 GPU (RDNA3)
+    { id: "w7900", name: "AMD Radeon PRO W7900 48GB", vram: 48 },
+    { id: "w7800", name: "AMD Radeon PRO W7800 32GB", vram: 32 },
+    { id: "w7700", name: "AMD Radeon PRO W7700 16GB", vram: 16 },
+    { id: "w7600", name: "AMD Radeon PRO W7600 8GB", vram: 8 },
+    { id: "w7500", name: "AMD Radeon PRO W7500 8GB", vram: 8 },
+    
+    // AMD 专业 GPU (RDNA2)
+    { id: "w6800", name: "AMD Radeon PRO W6800 32GB", vram: 32 },
+    { id: "w6600", name: "AMD Radeon PRO W6600 8GB", vram: 8 },
+    
+    // Intel 数据中心 GPU
+    { id: "gaudi2", name: "Intel Gaudi2 96GB", vram: 96 },
+    { id: "gaudi3", name: "Intel Gaudi3 128GB", vram: 128 },
+    { id: "ponte-vecchio", name: "Intel Data Center GPU Max 1550 128GB", vram: 128 },
+    { id: "ponte-vecchio-1100", name: "Intel Data Center GPU Max 1100 48GB", vram: 48 },
+    
+    // Intel 专业 GPU
+    { id: "arc-a770", name: "Intel Arc A770 16GB", vram: 16 },
+    { id: "arc-a750", name: "Intel Arc A750 8GB", vram: 8 },
+    { id: "arc-a580", name: "Intel Arc A580 8GB", vram: 8 },
+    
+    // Apple Silicon (统一内存架构)
+    { id: "m1-max", name: "Apple M1 Max 64GB", vram: 64 },
+    { id: "m1-ultra", name: "Apple M1 Ultra 128GB", vram: 128 },
+    { id: "m2-max", name: "Apple M2 Max 96GB", vram: 96 },
+    { id: "m2-ultra", name: "Apple M2 Ultra 192GB", vram: 192 },
+    { id: "m3-max", name: "Apple M3 Max 128GB", vram: 128 },
+    { id: "m4-max", name: "Apple M4 Max 128GB", vram: 128 },
+    
+    // Google TPU (仅供参考)
+    { id: "tpu-v4", name: "Google TPU v4 (32GB HBM)", vram: 32 },
+    { id: "tpu-v5e", name: "Google TPU v5e (16GB HBM)", vram: 16 },
+    { id: "tpu-v5p", name: "Google TPU v5p (95GB HBM)", vram: 95 },
+    
+].sort((a, b) => b.vram - a.vram);
+
+        // 初始化
+        new ParticleSystem();
+
+        const modelSelect = document.getElementById('model-select');
+        const quantSelect = document.getElementById('quant-select');
+        const contextInput = document.getElementById('context-input');
+
+        MODELS.forEach(m => {
+            const option = document.createElement('option');
+            option.value = m.id;
+            option.textContent = `${m.name} (${m.params})`;
+            modelSelect.appendChild(option);
+        });
+
+        QUANTIZATIONS.forEach(q => {
+            const option = document.createElement('option');
+            option.value = q.id;
+            option.textContent = `${q.name} - ${q.desc}`;
+            quantSelect.appendChild(option);
+        });
+
+        quantSelect.value = 'q4';
+
+        function calculateVRAM() {
+            const model = MODELS.find(m => m.id === modelSelect.value);
+            const quant = QUANTIZATIONS.find(q => q.id === quantSelect.value);
+            const contextLength = parseInt(contextInput.value);
+
+            const weightVRAM = model.base_vram_gb * quant.multiplier;
+            const kvCache = (contextLength / 4096) * (model.base_vram_gb * 0.15);
+            const frameworkOverhead = 1.5;
+            const totalVRAM = weightVRAM + kvCache + frameworkOverhead;
+
+            document.getElementById('weight-vram').textContent = `${weightVRAM.toFixed(2)} GB`;
+            document.getElementById('kv-cache').textContent = `${kvCache.toFixed(2)} GB`;
+            document.getElementById('total-vram').textContent = `${totalVRAM.toFixed(2)} GB`;
+
+            const recommendedGPU = GPUS.find(g => g.vram >= totalVRAM * 1.15) || GPUS[GPUS.length - 1];
+            const fits = recommendedGPU.vram >= totalVRAM * 1.15;
+            const occupancy = Math.min(100, (totalVRAM / recommendedGPU.vram * 100)).toFixed(0);
+
+            document.getElementById('recommended-gpu').textContent = recommendedGPU.name;
+            document.getElementById('gpu-vram').textContent = `${recommendedGPU.vram} GB`;
+            document.getElementById('occupancy').textContent = `${occupancy}%`;
+
+            const statusBadge = document.getElementById('status-badge');
+            if (fits) {
+                statusBadge.textContent = '✓ 可以满足';
+                statusBadge.className = 'status-badge status-success';
+            } else {
+                statusBadge.textContent = '✗ 显存不足';
+                statusBadge.className = 'status-badge status-warning';
+            }
+
+            const progress = document.getElementById('vram-progress');
+            const maxVRAM = Math.max(...GPUS.map(g => g.vram));
+            const progressPct = Math.min(100, (totalVRAM / maxVRAM * 100)).toFixed(0);
+            progress.style.width = `${progressPct}%`;
+            progress.textContent = `${progressPct}%`;
+
+            renderGPUList(totalVRAM);
+        }
+
+        function renderGPUList(requiredVRAM) {
+    const list = document.getElementById('gpu-list');
+    list.innerHTML = '';
+    
+    GPUS.forEach((gpu, index) => {
+        const item = document.createElement('div');
+        item.className = 'gpu-item';
+        item.dataset.index = index; // 添加索引数据属性
+        
+        const fits = gpu.vram >= requiredVRAM * 1.15;
+        const isRecommended = fits && (!list.querySelector('.recommended'));
+        
+        if (isRecommended) {
+            item.classList.add('recommended');
+        }
+        if (!fits) {
+            item.classList.add('insufficient');
+        }
+        
+        item.innerHTML = `
+            <span class="gpu-name">${gpu.name}</span>
+            <span class="gpu-vram">${gpu.vram}GB ${isRecommended ? '✓' : ''}</span>
+        `;
+        
+        // 添加点击事件处理
+        item.addEventListener('click', function(event) {
+            // 阻止事件冒泡
+            event.stopPropagation();
+            
+            console.log('GPU clicked:', gpu.name); // 调试用
+            
+            // 移除所有已选中的项目标记
+            document.querySelectorAll('.gpu-item').forEach(el => {
+                el.classList.remove('selected');
+                el.classList.remove('recommended');
+            });
+            
+            // 添加当前选中标记
+            this.classList.add('selected');
+            this.classList.add('recommended');
+            
+            // 更新推荐GPU显示
+            const totalVRAM = parseFloat(document.getElementById('total-vram').textContent) || 0;
+            const recommendedGPU = GPUS.find(g => g.vram >= totalVRAM * 1.15) || GPUS[GPUS.length - 1];
+            
+            if (recommendedGPU) {
+                document.getElementById('recommended-gpu').textContent = recommendedGPU.name;
+                document.getElementById('gpu-vram').textContent = `${recommendedGPU.vram} GB`;
+            }
+        });
+        
+        list.appendChild(item);
+    });
+}
+
+// 确保在DOM加载完成后执行
+document.addEventListener('DOMContentLoaded', function() {
+    // 如果需要初始化渲染，可以在这里调用
+    // renderGPUList(someRequiredVRAM);
+});
+        // function renderGPUList(requiredVRAM) {
+        //     const list = document.getElementById('gpu-list');
+        //     list.innerHTML = '';
+
+        //     GPUS.forEach(gpu => {
+        //         const item = document.createElement('div');
+        //         item.className = 'gpu-item';
+                
+        //         const fits = gpu.vram >= requiredVRAM * 1.15;
+        //         const isRecommended = fits && (!list.querySelector('.recommended'));
+                
+        //         if (isRecommended) {
+        //             item.classList.add('recommended');
+        //         }
+        //         if (!fits) {
+        //             item.classList.add('insufficient');
+        //         }
+
+        //         item.innerHTML = `
+        //             <span class="gpu-name">${gpu.name}</span>
+        //             <span class="gpu-vram">${gpu.vram}GB ${isRecommended ? '✓' : ''}</span>
+        //         `;
+                
+                
+        //         list.appendChild(item);
+        //     });
+        // }
+
+        function copyConfig() {
+            const model = MODELS.find(m => m.id === modelSelect.value);
+            const quant = QUANTIZATIONS.find(q => q.id === quantSelect.value);
+            const config = {
+                model: model.name,
+                quantization: quant.name,
+                context: contextInput.value,
+                estimatedVRAM: document.getElementById('total-vram').textContent
+            };
+            navigator.clipboard.writeText(JSON.stringify(config, null, 2));
+            alert('✓ 配置已复制到剪贴板');
+        }
+
+        function shareLink() {
+            const params = new URLSearchParams({
+                model: modelSelect.value,
+                quant: quantSelect.value,
+                ctx: contextInput.value
+            });
+            const url = `${location.origin}${location.pathname}?${params.toString()}`;
+            navigator.clipboard.writeText(url);
+            alert('✓ 分享链接已复制到剪贴板');
+        }
+
+        function resetForm() {
+            modelSelect.selectedIndex = 0;
+            quantSelect.value = 'q4';
+            contextInput.value = 4096;
+            calculateVRAM();
+        }
+
+        modelSelect.addEventListener('change', calculateVRAM);
+        quantSelect.addEventListener('change', calculateVRAM);
+        contextInput.addEventListener('input', calculateVRAM);
+
+        window.addEventListener('load', () => {
+            const params = new URLSearchParams(location.search);
+            if (params.has('model')) modelSelect.value = params.get('model');
+            if (params.has('quant')) quantSelect.value = params.get('quant');
+            if (params.has('ctx')) contextInput.value = params.get('ctx');
+            calculateVRAM();
+        });
+
+        calculateVRAM();
+    </script>
+</body>
+</html>
